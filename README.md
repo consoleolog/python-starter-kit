@@ -11,8 +11,7 @@ GitHub Issue 기반 협업 워크플로우를 빠르게 적용할 수 있는 스
 3. [브랜치 구조](#브랜치-구조)
 4. [개발 흐름](#개발-흐름)
 5. [자동화](#자동화)
-6. [Claude Code 설정](#claude-code-설정)
-7. [가이드](#가이드)
+6. [가이드](#가이드)
 
 ---
 
@@ -30,15 +29,27 @@ GitHub Issue 기반 협업 워크플로우를 빠르게 적용할 수 있는 스
 │   │   └── HOTFIX.md                   # 긴급 버그 수정 이슈 템플릿
 │   ├── workflows/
 │   │   ├── create-branch-on-issue.yml  # Issue Assign 시 브랜치 자동 생성
-│   │   ├── label-sync.yml              # 라벨 동기화
-│   │   ├── claude.yml                  # Claude Code (@claude 멘션 응답)
-│   │   └── claude-pr-review.yml        # Claude PR 자동 리뷰
+│   │   └── label-sync.yml              # 라벨 동기화
 │   └── issue-branch.yml                # 브랜치 자동 생성 규칙
-└── docs/
-    └── guides/
-        ├── COMMIT.md                   # 커밋 메시지 작성 가이드
-        ├── GIT_WORKFLOW.md             # Git 워크플로우 가이드
-        └── CODE_REVIEW.md              # 코드 리뷰 가이드
+├── docs/
+│   ├── configs/
+│   │   ├── BANDIT.md                   # bandit 보안 검사 설정 가이드
+│   │   ├── PYTEST.md                   # pytest 설정 가이드
+│   │   └── RUFF.md                     # ruff 린트/포맷 설정 가이드
+│   └── guides/
+│       ├── COMMIT.md                   # 커밋 메시지 작성 가이드
+│       ├── GIT_WORKFLOW.md             # Git 워크플로우 가이드
+│       └── CODE_REVIEW.md              # 코드 리뷰 가이드
+├── src/
+│   └── main.py                         # 프로젝트 진입점
+├── tests/
+│   ├── __init__.py
+│   └── conftest.py                     # 공용 pytest fixture
+├── .bandit.yaml                        # bandit 보안 검사 설정
+├── .ruff.toml                          # ruff 린트/포맷 설정
+├── lefthook.yml                        # pre-commit 훅 설정
+├── pyproject.toml                      # 프로젝트 의존성 (uv)
+└── pytest.ini                          # pytest 설정
 ```
 
 ---
@@ -61,6 +72,18 @@ git push origin dev
 GitHub 레포지토리 설정에서 기본 브랜치를 `dev`로 변경합니다.
 
 > `Settings` → `General` → `Default branch` → `dev`
+
+### 4. 의존성 설치
+
+```bash
+uv sync
+```
+
+### 5. pre-commit 훅 등록
+
+```bash
+lefthook install
+```
 
 ---
 
@@ -114,46 +137,79 @@ dev ◄─── feature/dev-<n>    dev
 
 Issue를 본인에게 Assign하면 `issue-branch.yml` 규칙에 따라 브랜치가 자동 생성됩니다.
 
-| label | 생성 브랜치 |
-|-------|------------|
+| label                                     | 생성 브랜치               |
+|-------------------------------------------|----------------------|
 | `enhancement`, `setup`, `bug`, `refactor` | `feature/dev-<이슈번호>` |
-| `hotfix` | `hotfix/main-<이슈번호>` |
+| `hotfix`                                  | `hotfix/main-<이슈번호>` |
 
-### Claude Code 자동화
+### pre-commit 훅 (lefthook)
 
-| 워크플로우 | 트리거 | 동작 |
-|---|---|---|
-| `claude.yml` | 이슈/PR 댓글에 `@claude` 멘션, 이슈 담당자를 `claude`로 지정 | 질문 답변, 코드 수정 후 PR 생성 |
-| `claude-pr-review.yml` | PR 생성 시 자동 실행 (Draft 제외) | 코드 리뷰 후 인라인 댓글 및 요약 작성 |
+커밋 시 아래 검사가 순서대로 실행됩니다.
+
+| 잡             | 대상                   | 실행 명령                        |
+|---------------|----------------------|------------------------------|
+| `ruff-lint`   | `*.py`               | `ruff check`                 |
+| `ruff-format` | `*.py`               | `ruff format --check`        |
+| `bandit`      | `*.py`               | `bandit -q`                  |
+| `test`        | `tests/**/test_*.py` | `pytest --no-cov -n auto -q` |
+
+훅을 수동으로 실행하려면:
+
+```bash
+lefthook run pre-commit
+```
 
 ---
 
-## Claude Code 설정
+## 실행 명령
 
-Claude 워크플로우를 사용하려면 `CLAUDE_CODE_OAUTH_TOKEN` 시크릿을 등록해야 합니다.
-
-### 1. OAuth Token 발급 및 GitHub Secrets 등록
-
-Claude Code CLI에서 아래 명령어를 실행하면 토큰 발급부터 GitHub Secrets 등록까지 자동으로 진행됩니다.
+### 린트 & 포맷
 
 ```bash
-claude setup-token
+# 린트 검사
+uv run ruff check .
+
+# 린트 자동 수정
+uv run ruff check --fix .
+
+# 포맷 검사
+uv run ruff format --check .
+
+# 포맷 적용
+uv run ruff format .
 ```
 
-### 2. 사용 방법
+### 보안 검사
 
-**`@claude` 멘션 (`claude.yml`)**
-- 이슈 또는 PR 댓글에 `@claude <요청 내용>` 작성
-- 이슈 담당자를 `claude`로 지정하면 자동으로 작업 시작
+```bash
+uv run bandit -r src/
+```
 
-**PR 자동 리뷰 (`claude-pr-review.yml`)**
-- PR을 생성하면 자동으로 코드 리뷰 시작
-- Draft PR은 제외되며, Ready for review 전환 시 실행
+### 테스트
+
+```bash
+# 전체 테스트 (커버리지 포함)
+uv run pytest
+
+# 커버리지 제외 (빠른 실행)
+uv run pytest --no-cov
+
+# 병렬 실행
+uv run pytest --no-cov -n auto
+```
 
 ---
 
 ## 가이드
 
+### 개발 가이드
+
 - [커밋 메시지 작성 가이드](docs/guides/COMMIT.md)
 - [Git 워크플로우 가이드](docs/guides/GIT_WORKFLOW.md)
 - [코드 리뷰 가이드](docs/guides/CODE_REVIEW.md)
+
+### 설정 가이드
+
+- [ruff 린트/포맷 설정](docs/configs/RUFF.md)
+- [bandit 보안 검사 설정](docs/configs/BANDIT.md)
+- [pytest 설정](docs/configs/PYTEST.md)
