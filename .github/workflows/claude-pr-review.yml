@@ -1,0 +1,55 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    # PR이 열리거나, 새 커밋이 푸시되거나, 재오픈되거나, 리뷰 준비 완료 시 실행
+    types: [ opened, synchronize, reopened, ready_for_review ]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    # Draft PR은 리뷰 대상에서 제외
+    if: github.event.pull_request.draft == false
+    # 무한 대기 방지를 위한 최대 실행 시간 제한
+    timeout-minutes: 15
+    permissions:
+      contents: read        # 코드 읽기 권한 (쓰기 불필요)
+      pull-requests: write  # PR에 리뷰 댓글 작성 권한
+      id-token: write       # OIDC 인증 토큰 발급 권한
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # 최신 커밋만 가져와 속도 최적화
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          # GitHub Secrets에 등록된 Claude OAuth 토큰
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # 리뷰 진행 상황을 PR에 실시간으로 표시
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            PR 리뷰를 시작하기 전에 아래 프로젝트 문서들을 먼저 읽어줘:
+
+            - `docs/guides/CODE_REVIEW.md` : 코드 리뷰 체크리스트 및 판정 기준
+            - `docs/guides/COMMIT.md` : 커밋 메시지 규칙
+
+            `docs/guides/CODE_REVIEW.md` 의 체크리스트를 기준으로 이 PR을 리뷰하고 한국어로 피드백을 작성해줘:
+
+            1. **커밋 단위**: 커밋이 최소 단위인지, 하나의 커밋을 더 분리할 수 있는지 확인
+            2. **테스트 코드**: 새로운 코드에 대응하는 테스트가 작성되었는지 확인
+            3. **커밋 메시지**: 커밋 메시지가 실제 변경 내용을 빠짐없이 담고 있는지 확인
+            4. **전체 평가**: Approve / Request Changes 중 하나를 권고
+
+          claude_args: |
+            # Claude에게 허용할 도구 목록 (보안상 필요한 도구만 명시적으로 허용)
+            # - mcp__github_inline_comment__create_inline_comment : 코드 특정 라인에 인라인 댓글 작성
+            # - gh pr comment : PR 전체 요약 댓글 작성
+            # - gh pr diff / gh pr view : PR 변경 내용 및 정보 조회
+            # - Read : 프로젝트 문서 파일 읽기
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read"

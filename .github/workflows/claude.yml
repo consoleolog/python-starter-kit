@@ -1,0 +1,44 @@
+name: Claude Code
+
+on:
+  issues:
+    # 이슈가 새로 열리거나 담당자가 지정될 때 실행
+    types: [opened, assigned]
+  issue_comment:
+    # 이슈에 댓글이 작성될 때 실행
+    types: [created]
+  pull_request_review:
+    # PR 리뷰가 제출될 때 실행
+    types: [submitted]
+  pull_request_review_comment:
+    # PR 리뷰 댓글이 작성될 때 실행
+    types: [created]
+
+permissions:
+  contents: write       # 코드 체크아웃 및 파일 수정 권한
+  pull-requests: write  # PR 생성 및 댓글 작성 권한
+  issues: write         # 이슈 댓글 작성 권한
+  id-token: write       # OIDC 인증 토큰 발급 권한
+  actions: read         # 워크플로우 실행 정보 읽기 권한
+
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # 최신 커밋만 가져와 속도 최적화 (전체 히스토리 불필요 시)
+          fetch-depth: 1
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          # GitHub Secrets에 등록된 Claude OAuth 토큰
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # 댓글에 @claude 를 멘션하면 Claude가 활성화됨
+          trigger_phrase: "@claude"
+          # 이슈 담당자를 'claude'로 지정하면 자동으로 Claude가 처리
+          assignee_trigger: "claude"
+          # Claude의 전체 실행 로그를 GitHub Actions에 출력
+          show_full_output: true
