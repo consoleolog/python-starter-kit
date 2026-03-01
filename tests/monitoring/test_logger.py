@@ -279,7 +279,7 @@ def test_file_handler_added_when_file_in_outputs(tmp_path):
 @pytest.mark.unit
 def test_file_handler_uses_processor_formatter(tmp_path):
     """file handler의 formatter가 ProcessorFormatter로 설정된다."""
-    StructuredLogger(name="app", config={"log_dir": str(tmp_path), "outputs": ["file"]})
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path), "outputs": ["file"], "error_tracking": False})
 
     handlers = [h for h in logging.getLogger().handlers if isinstance(h, RotatingFileHandler)]
     assert len(handlers) == 1
@@ -292,3 +292,43 @@ def test_file_handler_creates_log_file(tmp_path):
     StructuredLogger(name="myapp", config={"log_dir": str(tmp_path), "outputs": ["file"]})
 
     assert (tmp_path / "myapp.log").exists()
+
+
+# ---------------------------------------------------------------------------
+# Error tracking handler
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_error_handler_added_when_error_tracking_enabled(tmp_path):
+    """error_tracking=True이면 ERROR 전용 RotatingFileHandler가 추가된다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path), "outputs": ["file"], "error_tracking": True})
+
+    rotating_handlers = [h for h in logging.getLogger().handlers if isinstance(h, RotatingFileHandler)]
+    assert len(rotating_handlers) == 2  # file handler + error handler
+
+
+@pytest.mark.unit
+def test_error_handler_level_is_error(tmp_path):
+    """{name}.error.log 핸들러의 레벨이 ERROR로 설정된다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path), "outputs": ["file"], "error_tracking": True})
+
+    rotating_handlers = [h for h in logging.getLogger().handlers if isinstance(h, RotatingFileHandler)]
+    assert any(h.level == logging.ERROR for h in rotating_handlers)
+
+
+@pytest.mark.unit
+def test_error_handler_creates_error_log_file(tmp_path):
+    """{name}.error.log 파일이 log_dir에 생성된다."""
+    StructuredLogger(name="myapp", config={"log_dir": str(tmp_path), "outputs": ["file"], "error_tracking": True})
+
+    assert (tmp_path / "myapp.error.log").exists()
+
+
+@pytest.mark.unit
+def test_error_handler_not_added_when_error_tracking_disabled(tmp_path):
+    """error_tracking=False이면 ERROR 전용 핸들러가 추가되지 않는다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path), "outputs": ["file"], "error_tracking": False})
+
+    rotating_handlers = [h for h in logging.getLogger().handlers if isinstance(h, RotatingFileHandler)]
+    assert len(rotating_handlers) == 1  # file handler만 존재
