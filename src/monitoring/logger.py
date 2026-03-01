@@ -1,4 +1,7 @@
+import logging
 from pathlib import Path
+
+import structlog
 
 
 class StructuredLogger:
@@ -10,6 +13,7 @@ class StructuredLogger:
         if config:
             default_config.update(config)
         self.config = default_config
+        self.setup_logging()
 
     @staticmethod
     def _default_config() -> dict:
@@ -18,3 +22,19 @@ class StructuredLogger:
     def setup_logging(self):
         log_dir = Path(self.config.get("log_dir", "logs"))
         log_dir.mkdir(parents=True, exist_ok=True)
+
+        level = getattr(logging, self.config.get("log_level", "INFO").upper(), logging.INFO)
+
+        structlog.configure(
+            processors=[
+                structlog.stdlib.add_log_level,
+                structlog.processors.TimeStamper(fmt="iso", utc=False),
+                structlog.processors.dict_tracebacks,
+                structlog.dev.ConsoleRenderer(colors=True),  # TODO: JSON 으로 변경, Dev 에서는 Console 추가
+            ],
+            wrapper_class=structlog.make_filtering_bound_logger(level),
+            cache_logger_on_first_use=True,
+        )
+
+        root_logger = logging.getLogger()
+        root_logger.setLevel(level)
