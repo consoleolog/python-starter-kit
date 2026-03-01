@@ -1,4 +1,5 @@
 import logging
+import sys
 from pathlib import Path
 
 import structlog
@@ -17,7 +18,7 @@ class StructuredLogger:
 
     @staticmethod
     def _default_config() -> dict:
-        return {"log_level": "INFO", "log_dir": "logs"}
+        return {"log_level": "INFO", "log_dir": "logs", "outputs": ["console"]}
 
     def setup_logging(self):
         log_dir = Path(self.config.get("log_dir", "logs"))
@@ -45,3 +46,20 @@ class StructuredLogger:
 
         root_logger = logging.getLogger()
         root_logger.setLevel(level)
+
+        # 기존에 있던 handlers 삭제
+        root_logger.handlers.clear()
+
+        # Console handler
+        if "console" in self.config.get("outputs", []):
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setFormatter(
+                structlog.stdlib.ProcessorFormatter(
+                    processors=[
+                        structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                        structlog.dev.ConsoleRenderer(colors=True),
+                    ],
+                    foreign_pre_chain=shared_processors,
+                )
+            )
+            root_logger.addHandler(console_handler)
