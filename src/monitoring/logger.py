@@ -26,6 +26,7 @@ class StructuredLogger:
             "max_file_size": 10 * 1024 * 1024,  # 10MB
             "backup_count": 10,
             "format": "json",  # json or text
+            "error_tracking": True,
         }
 
     def _get_renderer(self, output_type: str):
@@ -100,3 +101,23 @@ class StructuredLogger:
                 )
             )
             root_logger.addHandler(file_handler)
+
+            # 에러 로그는 따로 관리
+            if self.config.get("error_tracking"):
+                error_handler = RotatingFileHandler(
+                    log_dir / f"{self.name}.error.log",
+                    maxBytes=self.config.get("max_file_size", 10 * 1024 * 1024),
+                    backupCount=self.config.get("backup_count", 10),
+                    encoding="utf-8",
+                )
+                error_handler.setLevel(logging.ERROR)
+                error_handler.setFormatter(
+                    structlog.stdlib.ProcessorFormatter(
+                        processors=[
+                            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                            self._get_renderer("file"),
+                        ],
+                        foreign_pre_chain=shared_processors,
+                    )
+                )
+                root_logger.addHandler(error_handler)
