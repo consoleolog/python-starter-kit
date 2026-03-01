@@ -2,6 +2,7 @@ import logging
 
 import pytest
 import structlog
+from structlog.testing import LogCapture, capture_logs
 
 from src.monitoring.logger import StructuredLogger
 
@@ -48,3 +49,53 @@ def test_log_dir_already_exists_no_error(tmp_path):
     logger = StructuredLogger(name="app", config={"log_dir": str(tmp_path)})
     logger.setup_logging()
     logger.setup_logging()  # 두 번 호출해도 예외 없음
+
+
+# ---------------------------------------------------------------------------
+# structlog.testing
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_info_event_captured_after_setup(tmp_path):
+    """setup_logging() 후 info 이벤트가 올바른 구조로 캡처된다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path)}).setup_logging()
+
+    with capture_logs() as cap_logs:
+        structlog.get_logger().info("login", user_id=42)
+
+    assert cap_logs == [{"event": "login", "user_id": 42, "log_level": "info"}]
+
+
+@pytest.mark.unit
+def test_debug_filtered_at_info_level(tmp_path):
+    """log_level=INFO 설정 시 DEBUG 이벤트는 캡처되지 않는다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path), "log_level": "INFO"}).setup_logging()
+
+    with capture_logs() as cap_logs:
+        log = structlog.get_logger()
+        log.debug("debug message")
+        log.info("info message")
+
+    assert len(cap_logs) == 1
+    assert cap_logs[0]["log_level"] == "info"
+
+
+@pytest.mark.unit
+def test_exception_includes_exception_field(tmp_path):
+    """except 블록에서 exception() 호출 시 dict_tracebacks가 exception 필드를 구조체로 변환한다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path)}).setup_logging()
+
+    cap = LogCapture()
+    structlog.configure(processors=[structlog.processors.dict_tracebacks, cap])
+
+    try:
+        raise ValueError("boom")
+    except ValueError:
+        structlog.get_logger().exception("unexpected error")
+
+    entry = cap.entries[0]
+    assert entry["log_level"] == "error"
+    assert "exc_info" not in entry
+    assert entry["exception"][0]["exc_type"] == "ValueError"
+    assert entry["exception"][0]["exc_value"] == "boom"
