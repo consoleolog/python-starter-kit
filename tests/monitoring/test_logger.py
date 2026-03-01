@@ -234,3 +234,29 @@ def test_setup_logging_clears_handlers_on_repeated_call(tmp_path):
 
     stream_handlers = [h for h in logging.getLogger().handlers if type(h) is logging.StreamHandler]
     assert len(stream_handlers) == 1
+
+
+# ---------------------------------------------------------------------------
+# _get_renderer
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_get_renderer_console_returns_console_renderer(tmp_path):
+    """console 출력 시 ConsoleRenderer(colors=True)를 반환한다."""
+    logger = StructuredLogger(name="app", config={"log_dir": str(tmp_path)})
+    assert isinstance(logger._get_renderer("console"), structlog.dev.ConsoleRenderer)
+
+
+@pytest.mark.unit
+def test_get_renderer_file_json_returns_json_renderer(tmp_path):
+    """file 출력 + format=json 시 JSONRenderer를 반환한다."""
+    logger = StructuredLogger(name="app", config={"log_dir": str(tmp_path), "format": "json"})
+    assert isinstance(logger._get_renderer("file"), structlog.processors.JSONRenderer)
+
+
+@pytest.mark.unit
+def test_get_renderer_file_text_returns_console_renderer(tmp_path):
+    """file 출력 + format=text 시 ConsoleRenderer(colors=False)를 반환한다."""
+    logger = StructuredLogger(name="app", config={"log_dir": str(tmp_path), "format": "text"})
+    assert isinstance(logger._get_renderer("file"), structlog.dev.ConsoleRenderer)

@@ -18,7 +18,25 @@ class StructuredLogger:
 
     @staticmethod
     def _default_config() -> dict:
-        return {"log_level": "INFO", "log_dir": "logs", "outputs": ["console"]}
+        return {
+            "log_level": "INFO",
+            "log_dir": "logs",
+            "outputs": ["console"],
+            "format": "json",  # json or text
+        }
+
+    def _get_renderer(self, output_type: str):
+        """출력 유형과 format 설정에 따라 적절한 렌더러를 반환한다.
+
+        console: ConsoleRenderer(colors=True) — format 설정과 무관하게 컬러 출력
+        file (format=json): JSONRenderer — PLG 스택 수집에 적합한 구조화 JSON
+        file (format=text): ConsoleRenderer(colors=False) — 사람이 읽기 쉬운 텍스트
+        """
+        if output_type == "console":
+            return structlog.dev.ConsoleRenderer(colors=True)
+        if self.config.get("format") == "json":
+            return structlog.processors.JSONRenderer()
+        return structlog.dev.ConsoleRenderer(colors=False)
 
     def setup_logging(self):
         log_dir = Path(self.config.get("log_dir", "logs"))
@@ -57,7 +75,7 @@ class StructuredLogger:
                 structlog.stdlib.ProcessorFormatter(
                     processors=[
                         structlog.stdlib.ProcessorFormatter.remove_processors_meta,
-                        structlog.dev.ConsoleRenderer(colors=True),
+                        self._get_renderer("console"),
                     ],
                     foreign_pre_chain=shared_processors,
                 )
