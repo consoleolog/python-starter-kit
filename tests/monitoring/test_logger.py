@@ -190,3 +190,47 @@ def test_add_logger_name(tmp_path):
     structlog.get_logger("myservice").info("event")
 
     assert cap.entries[0]["logger"] == "myservice"
+
+
+# ---------------------------------------------------------------------------
+# Console handler
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_console_handler_added_when_console_in_outputs(tmp_path):
+    """outputs에 console이 포함되면 root logger에 StreamHandler가 추가된다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path), "outputs": ["console"]})
+
+    handlers = logging.getLogger().handlers
+    assert any(type(h) is logging.StreamHandler for h in handlers)
+
+
+@pytest.mark.unit
+def test_console_handler_uses_processor_formatter(tmp_path):
+    """console handler의 formatter가 ProcessorFormatter로 설정된다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path), "outputs": ["console"]})
+
+    handlers = logging.getLogger().handlers
+    stream_handlers = [h for h in handlers if type(h) is logging.StreamHandler]
+    assert len(stream_handlers) == 1
+    assert isinstance(stream_handlers[0].formatter, structlog.stdlib.ProcessorFormatter)
+
+
+@pytest.mark.unit
+def test_console_handler_not_added_when_outputs_empty(tmp_path):
+    """outputs가 빈 리스트이면 root logger에 핸들러가 추가되지 않는다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path), "outputs": []})
+
+    handlers = logging.getLogger().handlers
+    assert not any(type(h) is logging.StreamHandler for h in handlers)
+
+
+@pytest.mark.unit
+def test_setup_logging_clears_handlers_on_repeated_call(tmp_path):
+    """setup_logging()을 여러 번 호출해도 StreamHandler가 중복 추가되지 않는다."""
+    logger = StructuredLogger(name="app", config={"log_dir": str(tmp_path), "outputs": ["console"]})
+    logger.setup_logging()
+
+    stream_handlers = [h for h in logging.getLogger().handlers if type(h) is logging.StreamHandler]
+    assert len(stream_handlers) == 1
