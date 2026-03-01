@@ -1,5 +1,6 @@
 import logging
 import sys
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import structlog
@@ -21,7 +22,9 @@ class StructuredLogger:
         return {
             "log_level": "INFO",
             "log_dir": "logs",
-            "outputs": ["console"],
+            "outputs": ["console", "file"],
+            "max_file_size": 10 * 1024 * 1024,  # 10MB
+            "backup_count": 10,
             "format": "json",  # json or text
         }
 
@@ -81,3 +84,19 @@ class StructuredLogger:
                 )
             )
             root_logger.addHandler(console_handler)
+
+        # File handler
+        if "file" in self.config.get("outputs", []):
+            file_handler = RotatingFileHandler(
+                log_dir / f"{self.name}.log",
+                maxBytes=self.config.get("max_file_size", 10 * 1024 * 1024),
+                backupCount=self.config.get("backup_count", 10),
+                encoding="utf-8",
+            )
+            file_handler.setFormatter(
+                structlog.stdlib.ProcessorFormatter(
+                    processors=[structlog.stdlib.ProcessorFormatter.remove_processors_meta, self._get_renderer("file")],
+                    foreign_pre_chain=shared_processors,
+                )
+            )
+            root_logger.addHandler(file_handler)

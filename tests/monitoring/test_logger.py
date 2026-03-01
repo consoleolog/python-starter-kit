@@ -1,4 +1,5 @@
 import logging
+from logging.handlers import RotatingFileHandler
 
 import pytest
 import structlog
@@ -260,3 +261,34 @@ def test_get_renderer_file_text_returns_console_renderer(tmp_path):
     """file 출력 + format=text 시 ConsoleRenderer(colors=False)를 반환한다."""
     logger = StructuredLogger(name="app", config={"log_dir": str(tmp_path), "format": "text"})
     assert isinstance(logger._get_renderer("file"), structlog.dev.ConsoleRenderer)
+
+
+# ---------------------------------------------------------------------------
+# File handler
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_file_handler_added_when_file_in_outputs(tmp_path):
+    """outputs에 file이 포함되면 root logger에 RotatingFileHandler가 추가된다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path), "outputs": ["file"]})
+
+    assert any(isinstance(h, RotatingFileHandler) for h in logging.getLogger().handlers)
+
+
+@pytest.mark.unit
+def test_file_handler_uses_processor_formatter(tmp_path):
+    """file handler의 formatter가 ProcessorFormatter로 설정된다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path), "outputs": ["file"]})
+
+    handlers = [h for h in logging.getLogger().handlers if isinstance(h, RotatingFileHandler)]
+    assert len(handlers) == 1
+    assert isinstance(handlers[0].formatter, structlog.stdlib.ProcessorFormatter)
+
+
+@pytest.mark.unit
+def test_file_handler_creates_log_file(tmp_path):
+    """{name}.log 파일이 log_dir에 생성된다."""
+    StructuredLogger(name="myapp", config={"log_dir": str(tmp_path), "outputs": ["file"]})
+
+    assert (tmp_path / "myapp.log").exists()
