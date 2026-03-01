@@ -99,3 +99,94 @@ def test_exception_includes_exception_field(tmp_path):
     assert "exc_info" not in entry
     assert entry["exception"][0]["exc_type"] == "ValueError"
     assert entry["exception"][0]["exc_value"] == "boom"
+
+
+@pytest.mark.unit
+def test_merge_contextvars(tmp_path):
+    """bind_contextvars()로 바인딩된 컨텍스트가 이후 모든 이벤트에 자동으로 병합된다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path)})
+
+    structlog.contextvars.bind_contextvars(request_id="req-123")
+    cap = LogCapture()
+    structlog.configure(processors=[structlog.contextvars.merge_contextvars, cap])
+
+    try:
+        structlog.get_logger().info("request received")
+    finally:
+        structlog.contextvars.clear_contextvars()
+
+    assert cap.entries[0]["event"] == "request received"
+    assert cap.entries[0]["request_id"] == "req-123"
+
+
+@pytest.mark.unit
+def test_positional_arguments_formatted(tmp_path):
+    """%s 스타일 포맷 인자가 event 문자열로 치환된다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path)})
+
+    cap = LogCapture()
+    structlog.configure(processors=[structlog.stdlib.PositionalArgumentsFormatter(), cap])
+
+    structlog.get_logger().info("user %s logged in", "alice")
+
+    assert cap.entries[0]["event"] == "user alice logged in"
+
+
+@pytest.mark.unit
+def test_stack_info_rendered(tmp_path):
+    """stack_info=True 전달 시 현재 콜스택이 문자열로 변환된다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path)})
+
+    cap = LogCapture()
+    structlog.configure(processors=[structlog.processors.StackInfoRenderer(), cap])
+
+    structlog.get_logger().info("trace this", stack_info=True)
+
+    entry = cap.entries[0]
+    assert isinstance(entry.get("stack"), str)
+    assert "test_stack_info_rendered" in entry["stack"]
+
+
+@pytest.mark.unit
+def test_set_exc_info_adds_exc_info_on_exception_call(tmp_path):
+    """log.exception() 호출 시 set_exc_info가 exc_info=True를 이벤트에 주입한다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path)})
+
+    cap = LogCapture()
+    structlog.configure(processors=[structlog.dev.set_exc_info, cap])
+
+    try:
+        raise ValueError("boom")
+    except ValueError:
+        structlog.get_logger().exception("something failed")
+
+    assert cap.entries[0]["exc_info"] is True
+
+
+@pytest.mark.unit
+def test_set_exc_info_not_added_for_error_call(tmp_path):
+    """log.error() 호출 시 set_exc_info는 exc_info를 주입하지 않는다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path)})
+
+    cap = LogCapture()
+    structlog.configure(processors=[structlog.dev.set_exc_info, cap])
+
+    try:
+        raise ValueError("boom")
+    except ValueError:
+        structlog.get_logger().error("something failed")
+
+    assert "exc_info" not in cap.entries[0]
+
+
+@pytest.mark.unit
+def test_add_logger_name(tmp_path):
+    """add_logger_name이 logger 필드에 로거 이름을 자동 추가한다."""
+    StructuredLogger(name="app", config={"log_dir": str(tmp_path)}).setup_logging()
+
+    cap = LogCapture()
+    structlog.configure(processors=[structlog.stdlib.add_logger_name, cap])
+
+    structlog.get_logger("myservice").info("event")
+
+    assert cap.entries[0]["logger"] == "myservice"
