@@ -25,14 +25,21 @@ class StructuredLogger:
 
         level = getattr(logging, self.config.get("log_level", "INFO").upper(), logging.INFO)
 
+        shared_processors = [
+            structlog.contextvars.merge_contextvars,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.TimeStamper(fmt="iso", utc=False),
+            structlog.processors.StackInfoRenderer(),
+            structlog.dev.set_exc_info,
+            structlog.processors.dict_tracebacks,
+        ]
+
         structlog.configure(
-            processors=[
-                structlog.stdlib.add_log_level,
-                structlog.processors.TimeStamper(fmt="iso", utc=False),
-                structlog.processors.dict_tracebacks,
-                structlog.dev.ConsoleRenderer(colors=True),  # TODO: JSON 으로 변경, Dev 에서는 Console 추가
-            ],
+            processors=[*shared_processors, structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
             wrapper_class=structlog.make_filtering_bound_logger(level),
+            logger_factory=structlog.stdlib.LoggerFactory(),
             cache_logger_on_first_use=True,
         )
 
