@@ -79,3 +79,10 @@ Desktop.ini
 # Logs
 *.log
 logs/
+
+# AI coding assistants
+.claude/
+.gemini/
+.cursor/
+.continue/
+.aider*
