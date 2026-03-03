@@ -39,12 +39,22 @@ GitHub Issue 기반 협업 워크플로우를 빠르게 적용할 수 있는 스
 │   └── guides/
 │       ├── COMMIT.md                   # 커밋 메시지 작성 가이드
 │       ├── GIT_WORKFLOW.md             # Git 워크플로우 가이드
-│       └── CODE_REVIEW.md              # 코드 리뷰 가이드
+│       ├── CODE_REVIEW.md              # 코드 리뷰 가이드
+│       └── MONITORING.md              # 모니터링 가이드 (PLG 스택)
+├── config/
+│   ├── loki/config.yml                 # Loki 설정
+│   ├── alloy/config.alloy              # Alloy 파이프라인 설정
+│   └── grafana/provisioning/
+│       └── datasources/loki.yml        # Grafana Loki 데이터소스 자동 등록
 ├── src/
+│   ├── monitoring/
+│   │   └── logger.py                   # 구조화 JSON 로거 (structlog)
 │   └── main.py                         # 프로젝트 진입점
 ├── tests/
 │   ├── __init__.py
 │   └── conftest.py                     # 공용 pytest fixture
+├── docker-compose.monitoring.yaml       # 모니터링 스택 (Loki + Alloy + Grafana)
+├── .env.example                        # 환경 변수 예시
 ├── .bandit.yaml                        # bandit 보안 검사 설정
 ├── .ruff.toml                          # ruff 린트/포맷 설정
 ├── lefthook.yml                        # pre-commit 훅 설정
@@ -207,6 +217,7 @@ uv run pytest --no-cov -n auto
 - [커밋 메시지 작성 가이드](docs/guides/COMMIT.md)
 - [Git 워크플로우 가이드](docs/guides/GIT_WORKFLOW.md)
 - [코드 리뷰 가이드](docs/guides/CODE_REVIEW.md)
+- [모니터링 가이드](docs/guides/MONITORING.md)
 
 ### 설정 가이드
 
