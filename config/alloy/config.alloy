@@ -10,8 +10,37 @@ local.file_match "local_files" {
 // 2. 로그 파일 스크래핑
 loki.source.file "log_scrape" {
   targets    = local.file_match.local_files.targets
-  forward_to = [loki.write.grafana_loki.receiver]
+  forward_to = [loki.process.parse_json.receiver]
   tail_from_end = true
+}
+
+// 3. JSON 파싱 + 주요 필드 Loki 레이블로 등록
+loki.process "parse_json" {
+  forward_to = [loki.write.grafana_loki.receiver]
+
+  // JSON 파싱
+  stage.json {
+    expressions = {
+      level           = "level",
+      logger          = "logger",
+      timestamp       = "timestamp",
+    }
+  }
+
+  // 추출한 값을 Loki 스트림 레이블로 등록.
+  stage.labels {
+    values = {
+      level          = "level",
+      logger         = "logger",
+    }
+  }
+
+  // 수집 시간 대신 로그 자체의 타임스탬프를 사용한다.
+  stage.timestamp {
+    source = "timestamp"
+    format = "RFC3339"
+  }
+
 }
 
 // Loki 엔드포인트 (컨테이너 내부에서는 Docker 서비스명으로 접근)
