@@ -3,7 +3,7 @@
 
 // 1. 로그 파일 탐색
 local.file_match "local_files" {
-  path_targets = [{__path__ = "/var/log/app/*.log"}],
+  path_targets = [{__path__ = "/var/log/app/*.log"}]
   sync_period = "5s"
 }
 
