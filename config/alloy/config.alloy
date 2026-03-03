@@ -44,9 +44,9 @@ loki.process "parse_json" {
 }
 
 // Loki 엔드포인트 (컨테이너 내부에서는 Docker 서비스명으로 접근)
-// LOKI_PORT 환경변수로 포트를 주입한다. 기본값은 3100.
+// 내부 통신은 Loki 고정 포트 3100 사용
 loki.write "grafana_loki" {
   endpoint {
-    url = "http://loki:" + coalesce(env("LOKI_PORT"), "3100") + "/loki/api/v1/push"
+    url = "http://loki:3100/loki/api/v1/push"
   }
 }
