@@ -1,0 +1,23 @@
+// Grafana Alloy 기본 설정
+// logs/ 디렉토리의 로그 파일을 테일링해서 Loki로 전송한다.
+
+// 1. 로그 파일 탐색
+local.file_match "local_files" {
+  path_targets = [{__path__ = "/var/log/app/*.log"}],
+  sync_period = "5s"
+}
+
+// 2. 로그 파일 스크래핑
+loki.source.file "log_scrape" {
+  targets    = local.file_match.local_files.targets
+  forward_to = [loki.write.grafana_loki.receiver]
+  tail_from_end = true
+}
+
+// Loki 엔드포인트 (컨테이너 내부에서는 Docker 서비스명으로 접근)
+// LOKI_PORT 환경변수로 포트를 주입한다. 기본값은 3100.
+loki.write "grafana_loki" {
+  endpoint {
+    url = "http://loki:" + coalesce(env("LOKI_PORT"), "3100") + "/loki/api/v1/push"
+  }
+}
