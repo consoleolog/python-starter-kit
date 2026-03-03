@@ -263,6 +263,16 @@ def test_get_renderer_file_text_returns_console_renderer(tmp_path):
     assert isinstance(logger._get_renderer("file"), structlog.dev.ConsoleRenderer)
 
 
+@pytest.mark.unit
+def test_json_renderer_does_not_escape_korean(tmp_path):
+    """JSONRenderer가 한글을 \\uXXXX로 이스케이프하지 않고 그대로 직렬화한다."""
+    logger = StructuredLogger(name="app", config={"log_dir": str(tmp_path), "format": "json"})
+    renderer = logger._get_renderer("file")
+    result = renderer(None, None, {"event": "한글 테스트"})
+    assert "한글 테스트" in result
+    assert "\\u" not in result
+
+
 # ---------------------------------------------------------------------------
 # File handler
 # ---------------------------------------------------------------------------

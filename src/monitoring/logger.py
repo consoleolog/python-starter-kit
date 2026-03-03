@@ -1,5 +1,7 @@
+import json
 import logging
 import sys
+from functools import partial
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -39,7 +41,7 @@ class StructuredLogger:
         if output_type == "console":
             return structlog.dev.ConsoleRenderer(colors=True)
         if self.config.get("format") == "json":
-            return structlog.processors.JSONRenderer()
+            return structlog.processors.JSONRenderer(serializer=partial(json.dumps, ensure_ascii=False))
         return structlog.dev.ConsoleRenderer(colors=False)
 
     def setup_logging(self):
