@@ -86,3 +86,5 @@ logs/
 .cursor/
 .continue/
 .aider*
+
+gha-creds-*.json
