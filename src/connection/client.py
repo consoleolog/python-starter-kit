@@ -1,3 +1,5 @@
+from typing import Any
+
 import aiohttp
 import structlog
 
@@ -103,3 +105,88 @@ class HttpClient:
         """세션이 없거나 닫혀 있으면 connect()를 호출해 세션을 보장한다."""
         if self._session is None or self._session.closed:
             await self.connect()
+
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        body: Any = None,
+    ) -> aiohttp.ClientResponse:
+        """HTTP 요청을 전송하고 ClientResponse를 반환하는 공통 메서드.
+
+        Args:
+            method: HTTP 메서드 (GET, POST, PUT, PATCH, DELETE 등).
+            url: 요청 대상 URL.
+            params: URL 쿼리 파라미터.
+            headers: 요청별 추가 헤더. 세션 기본 헤더에 병합된다.
+            body: 요청 본문.
+                  dict이거나 Content-Type이 application/json이면 JSON으로 직렬화.
+                  str / bytes는 그대로 전송.
+                  None이면 본문 없음.
+
+        Returns:
+            aiohttp.ClientResponse 인스턴스. 호출자가 직접 읽고 release() 해야 한다.
+
+        Raises:
+            aiohttp.ClientError: 네트워크 오류 또는 연결 실패 시.
+        """
+        await self._ensure_session()
+
+        kwargs: dict[str, Any] = {}
+
+        if params:
+            kwargs["params"] = params
+
+        if headers:
+            kwargs["headers"] = headers
+
+        if body is not None:
+            content_type = (headers or {}).get("Content-Type", "")
+            if isinstance(body, dict) or "application/json" in content_type:
+                kwargs["json"] = body
+            else:
+                kwargs["data"] = body
+
+        logger.debug(
+            "→ HTTP Request",
+            method=method.upper(),
+            url=url,
+            params=params,
+            has_body=body is not None,
+        )
+
+        return await self._session.request(method.upper(), url, **kwargs)
+
+    async def get(
+        self,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> aiohttp.ClientResponse:
+        """GET 요청을 전송한다."""
+        return await self._request("GET", url, params=params, headers=headers)
+
+    async def post(
+        self,
+        url: str,
+        *,
+        body: Any = None,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> aiohttp.ClientResponse:
+        """POST 요청을 전송한다."""
+        return await self._request("POST", url, params=params, headers=headers, body=body)
+
+    async def delete(
+        self,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> aiohttp.ClientResponse:
+        """DELETE 요청을 전송한다."""
+        return await self._request("DELETE", url, params=params, headers=headers)

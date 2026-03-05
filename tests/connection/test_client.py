@@ -328,3 +328,214 @@ async def test_ensure_session_skips_connect_when_session_active(mocker, default_
     await client._ensure_session()
 
     mock_connect.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# _request
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def client_with_session(default_config):
+    """활성 세션이 주입된 HttpClient를 반환한다."""
+    client = HttpClient(default_config)
+    mock_session = MagicMock()
+    mock_session.closed = False
+    mock_session.request = AsyncMock(return_value=MagicMock(spec=aiohttp.ClientResponse))
+    client._session = mock_session
+    return client
+
+
+@pytest.mark.unit
+async def test_request_calls_ensure_session(mocker, default_config):
+    """_request() 호출 시 _ensure_session()이 먼저 호출된다."""
+    client = HttpClient(default_config)
+    mock_ensure = mocker.patch.object(client, "_ensure_session", new_callable=AsyncMock)
+    mock_session = MagicMock()
+    mock_session.request = AsyncMock(return_value=MagicMock())
+    client._session = mock_session
+
+    await client._request("GET", "https://example.com")
+
+    mock_ensure.assert_awaited_once()
+
+
+@pytest.mark.unit
+async def test_request_passes_method_and_url(client_with_session):
+    """_request()가 method와 url을 session.request()에 올바르게 전달한다."""
+    await client_with_session._request("GET", "https://example.com/users")
+
+    client_with_session._session.request.assert_awaited_once()
+    call_args = client_with_session._session.request.call_args
+    assert call_args.args == ("GET", "https://example.com/users")
+
+
+@pytest.mark.unit
+async def test_request_uppercases_method(client_with_session):
+    """_request()는 소문자 메서드도 대문자로 변환해 전달한다."""
+    await client_with_session._request("get", "https://example.com")
+
+    call_args = client_with_session._session.request.call_args
+    assert call_args.args[0] == "GET"
+
+
+@pytest.mark.unit
+async def test_request_passes_params(client_with_session):
+    """params가 있으면 session.request()에 params 키워드로 전달된다."""
+    await client_with_session._request("GET", "https://example.com", params={"page": 1})
+
+    call_kwargs = client_with_session._session.request.call_args.kwargs
+    assert call_kwargs["params"] == {"page": 1}
+
+
+@pytest.mark.unit
+async def test_request_omits_params_when_none(client_with_session):
+    """params가 None이면 session.request() kwargs에 포함되지 않는다."""
+    await client_with_session._request("GET", "https://example.com", params=None)
+
+    call_kwargs = client_with_session._session.request.call_args.kwargs
+    assert "params" not in call_kwargs
+
+
+@pytest.mark.unit
+async def test_request_passes_headers(client_with_session):
+    """headers가 있으면 session.request()에 headers 키워드로 전달된다."""
+    await client_with_session._request("GET", "https://example.com", headers={"X-Token": "abc"})
+
+    call_kwargs = client_with_session._session.request.call_args.kwargs
+    assert call_kwargs["headers"] == {"X-Token": "abc"}
+
+
+@pytest.mark.unit
+async def test_request_sends_dict_body_as_json(client_with_session):
+    """body가 dict이면 session.request()에 json= 키워드로 전달된다."""
+    await client_with_session._request("POST", "https://example.com", body={"name": "Alice"})
+
+    call_kwargs = client_with_session._session.request.call_args.kwargs
+    assert call_kwargs["json"] == {"name": "Alice"}
+    assert "data" not in call_kwargs
+
+
+@pytest.mark.unit
+async def test_request_sends_json_content_type_body_as_json(client_with_session):
+    """Content-Type이 application/json이면 str body도 json=으로 전달된다."""
+    await client_with_session._request(
+        "POST",
+        "https://example.com",
+        headers={"Content-Type": "application/json"},
+        body='{"name": "Alice"}',
+    )
+
+    call_kwargs = client_with_session._session.request.call_args.kwargs
+    assert call_kwargs["json"] == '{"name": "Alice"}'
+    assert "data" not in call_kwargs
+
+
+@pytest.mark.unit
+async def test_request_sends_str_body_as_data(client_with_session):
+    """body가 str이고 Content-Type이 application/json이 아니면 data=로 전달된다."""
+    await client_with_session._request("POST", "https://example.com", body="raw text")
+
+    call_kwargs = client_with_session._session.request.call_args.kwargs
+    assert call_kwargs["data"] == "raw text"
+    assert "json" not in call_kwargs
+
+
+@pytest.mark.unit
+async def test_request_omits_body_when_none(client_with_session):
+    """body가 None이면 json과 data 모두 kwargs에 포함되지 않는다."""
+    await client_with_session._request("POST", "https://example.com", body=None)
+
+    call_kwargs = client_with_session._session.request.call_args.kwargs
+    assert "json" not in call_kwargs
+    assert "data" not in call_kwargs
+
+
+@pytest.mark.unit
+async def test_request_returns_client_response(client_with_session):
+    """_request()는 session.request()의 반환값을 그대로 반환한다."""
+    fake_resp = MagicMock(spec=aiohttp.ClientResponse)
+    client_with_session._session.request = AsyncMock(return_value=fake_resp)
+
+    result = await client_with_session._request("GET", "https://example.com")
+
+    assert result is fake_resp
+
+
+# ---------------------------------------------------------------------------
+# get / post / delete
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+async def test_get_calls_request_with_get_method(mocker, default_config):
+    """get()은 _request()를 GET 메서드로 호출한다."""
+    client = HttpClient(default_config)
+    mock_request = mocker.patch.object(client, "_request", new_callable=AsyncMock)
+
+    await client.get("https://example.com/users")
+
+    mock_request.assert_awaited_once_with("GET", "https://example.com/users", params=None, headers=None)
+
+
+@pytest.mark.unit
+async def test_get_passes_params_and_headers(mocker, default_config):
+    """get()은 params와 headers를 _request()에 전달한다."""
+    client = HttpClient(default_config)
+    mock_request = mocker.patch.object(client, "_request", new_callable=AsyncMock)
+
+    await client.get("https://example.com/users", params={"page": 2}, headers={"X-Token": "abc"})
+
+    mock_request.assert_awaited_once_with(
+        "GET", "https://example.com/users", params={"page": 2}, headers={"X-Token": "abc"}
+    )
+
+
+@pytest.mark.unit
+async def test_post_calls_request_with_post_method(mocker, default_config):
+    """post()는 _request()를 POST 메서드로 호출한다."""
+    client = HttpClient(default_config)
+    mock_request = mocker.patch.object(client, "_request", new_callable=AsyncMock)
+
+    await client.post("https://example.com/users")
+
+    mock_request.assert_awaited_once_with(
+        "POST", "https://example.com/users", params=None, headers=None, body=None
+    )
+
+
+@pytest.mark.unit
+async def test_post_passes_body(mocker, default_config):
+    """post()는 body를 _request()에 전달한다."""
+    client = HttpClient(default_config)
+    mock_request = mocker.patch.object(client, "_request", new_callable=AsyncMock)
+
+    await client.post("https://example.com/users", body={"name": "Alice"})
+
+    mock_request.assert_awaited_once_with(
+        "POST", "https://example.com/users", params=None, headers=None, body={"name": "Alice"}
+    )
+
+
+@pytest.mark.unit
+async def test_delete_calls_request_with_delete_method(mocker, default_config):
+    """delete()는 _request()를 DELETE 메서드로 호출한다."""
+    client = HttpClient(default_config)
+    mock_request = mocker.patch.object(client, "_request", new_callable=AsyncMock)
+
+    await client.delete("https://example.com/users/1")
+
+    mock_request.assert_awaited_once_with("DELETE", "https://example.com/users/1", params=None, headers=None)
+
+
+@pytest.mark.unit
+async def test_delete_passes_params_and_headers(mocker, default_config):
+    """delete()는 params와 headers를 _request()에 전달한다."""
+    client = HttpClient(default_config)
+    mock_request = mocker.patch.object(client, "_request", new_callable=AsyncMock)
+
+    await client.delete("https://example.com/users/1", params={"force": "true"}, headers={"X-Token": "abc"})
+
+    mock_request.assert_awaited_once_with(
+        "DELETE", "https://example.com/users/1", params={"force": "true"}, headers={"X-Token": "abc"}
+    )
