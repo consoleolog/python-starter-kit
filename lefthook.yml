@@ -7,7 +7,7 @@ pre-commit:
 
     - name: ruff-format
       glob: "*.py"
-      run: uv run ruff format --check {staged_files}
+      run: uv run ruff format {staged_files}
 
     - name: bandit
       glob: "src/**/*.py"
