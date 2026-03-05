@@ -9,7 +9,9 @@ dependencies = [
     "asyncpg>=0.31.0",      # Postgres 비동기 클라이언트
     "redis>=7.2.1",         # Redis 클라이언트
     # --- 환경 변수 ---
-    "python-dotenv>=1.2.2", # .env 로드 
+    "python-dotenv>=1.2.2", # .env 로드
+    # --- 직렬화 ---
+    "orjson>=3.10.0",       # 고성능 JSON 직렬화/역직렬화
     # --- PLG 로깅/모니터링 ---
     "structlog>=25.5.0",    # 구조화된 로깅 라이브러리
 ]
