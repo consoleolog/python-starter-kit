@@ -1,3 +1,4 @@
 from .cache import RedisClient
+from .database import PostgresPool
 
-__all__ = ["RedisClient"]
+__all__ = ["PostgresPool", "RedisClient"]
