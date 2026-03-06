@@ -5,7 +5,7 @@ import pytest
 import structlog
 from structlog.testing import LogCapture, capture_logs
 
-from src.monitoring.logger import StructuredLogger
+from monitoring.logger import StructuredLogger
 
 
 @pytest.fixture(autouse=True)

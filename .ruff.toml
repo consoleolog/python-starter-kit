@@ -3,6 +3,7 @@
 
 line-length = 120
 target-version = "py310"
+src = ["src", "tests"]
 
 [lint]
 select = [
@@ -20,9 +21,6 @@ select = [
 ignore = [
     "E501", # line-length는 formatter에 위임
 ]
-
-[lint.isort]
-known-first-party = ["src"]
 
 [format]
 quote-style = "double"
