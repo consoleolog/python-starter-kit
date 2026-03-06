@@ -1,18 +1,18 @@
 pre-commit:
-  parallel: false
+  piped: true
   jobs:
-    - name: ruff-lint
-      glob: "*.py"
-      run: uv run ruff check {staged_files}
-
     - name: ruff-format
       glob: "*.py"
       run: uv run ruff format {staged_files}
 
-    - name: bandit
-      glob: "src/**/*.py"
-      run: uv run bandit -q {staged_files}
+    - name: ruff-lint
+      glob: "*.py"
+      run: uv run ruff check --fix {staged_files}
 
     - name: test
       glob: "tests/**/test_*.py"
       run: uv run pytest {staged_files} --no-cov -n auto -q --no-header
+
+    - name: bandit
+      glob: "src/**/*.py"
+      run: uv run bandit -q {staged_files}
